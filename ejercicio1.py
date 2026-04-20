@@ -1,89 +1,75 @@
-"""
+'''
 Grupo formado por:
-- Nombre Apellido1 Apellido2 (num matrícula)
-- Nombre Apellido1 Apellido2 (num matrícula)
+- Lucía Martínez Miramontes (23C047)
+- Laura García González (23C040)
 
 Grafo de representación de la consulta:
-Source -> Map(parse) -> Filter(spd > 90) -> Map(csv) -> Sink
+Source -> Map(parse) -> Filter(speed > 90) -> Map(csv con campos seleccionados) -> Sink
 
-Justificación de la utilización de los operadores:
+Justificación:
 - Source: lee el fichero CSV de entrada.
 - Map(parse): transforma cada línea en una tupla tipada.
 - Filter: selecciona únicamente los vehículos que superan 90 mph.
 - Map(csv): adapta la salida al formato pedido.
-- Sink: escribe el resultado en fichero.
-"""
+- Sink: escribe la salida en formato CSV en /files/ejercicio1 con ficheros radar-XXXXX.csv.
+'''
 
+
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.common.typeinfo import Types
+from pyflink.datastream.connectors.file_system import FileSink, OutputFileConfig
+from pyflink.common.serialization import Encoder
 import argparse
 
-from pyflink.common import Types
-from pyflink.common.serialization import Encoder
-from pyflink.datastream import StreamExecutionEnvironment
-from pyflink.datastream.connectors.file_system import FileSink, OutputFileConfig
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--input', required=True, help="Ruta del fichero de entrada")
+args = parser.parse_args()
+env = StreamExecutionEnvironment.get_execution_environment()
+env.set_parallelism(1)
+ds = env.read_text_file(args.input)
 
 
-def parse_line(line: str):
-    parts = line.strip().split(",")
+def parse(line):
+    fields = line.strip().split(",")
     return (
-        int(parts[0]),  # Time
-        int(parts[1]),  # VID
-        int(parts[2]),  # Spd
-        int(parts[3]),  # XWay
-        int(parts[4]),  # Lane
-        int(parts[5]),  # Dir
-        int(parts[6]),  # Seg
-        int(parts[7]),  # Pos
+        int(fields[0]),  
+        int(fields[1]),  
+        int(fields[2]),  
+        int(fields[3]),  
+        int(fields[4]),
+        int(fields[5]),
+        int(fields[6]),
+        int(fields[7])
     )
 
-
-def to_output_csv(event):
-    # Formato: Time, VID, XWay, Spd
-    return f"{event[0]},{event[1]},{event[3]},{event[2]}"
-
-
-def build_sink(output_path: str, prefix: str):
-    return (
-        FileSink
-        .for_row_format(output_path, Encoder.simple_string_encoder())
-        .with_output_file_config(
-            OutputFileConfig.builder()
-            .with_part_prefix(prefix)
-            .with_part_suffix(".csv")
-            .build()
-        )
-        .build()
-    )
+parsed = ds.map(parse, output_type=Types.TUPLE([
+    Types.INT(), Types.INT(), Types.INT(), Types.INT(),
+    Types.INT(), Types.INT(), Types.INT(), Types.INT()
+])).filter(lambda x: x is not None)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True, help="Ruta del fichero de entrada")
-    args = parser.parse_args()
-
-    env = StreamExecutionEnvironment.get_execution_environment()
-    env.set_parallelism(1)
-
-    ds = env.read_text_file(args.input)
-
-    parsed = ds.map(
-        parse_line,
-        output_type=Types.TUPLE([
-            Types.INT(), Types.INT(), Types.INT(), Types.INT(),
-            Types.INT(), Types.INT(), Types.INT(), Types.INT()
-        ])
-    )
-
-    alerts = (
-        parsed
-        .filter(lambda x: x[2] > 90)
-        .map(to_output_csv, output_type=Types.STRING())
-    )
-
-    sink = build_sink("/files/ejercicio1", "radar")
-    alerts.sink_to(sink)
-
-    env.execute("Ejercicio 1 - Radar")
+speeding = parsed.filter(lambda x: x[2] > 90)
+result = speeding.map(
+    lambda x: f"{x[0]},{x[1]},{x[3]},{x[2]}",
+    output_type=Types.STRING()
+)
 
 
-if __name__ == "__main__":
-    main()
+sink = FileSink.for_row_format(
+    "/files/ejercicio1",
+    Encoder.simple_string_encoder()
+).with_output_file_config(
+    OutputFileConfig.builder()
+    .with_part_prefix("radar")
+    .with_part_suffix(".csv")
+    .build()
+).build()
+
+
+result.sink_to(sink)
+env.execute("Radar")
+
+
+
+

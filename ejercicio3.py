@@ -18,7 +18,6 @@ Justificación de la utilización de los operadores:
 """
 
 import argparse
-
 from pyflink.common import Duration, Types
 from pyflink.common.serialization import Encoder
 from pyflink.common.watermark_strategy import WatermarkStrategy, TimestampAssigner
@@ -31,14 +30,14 @@ from pyflink.datastream.state import ValueStateDescriptor
 def parse_line(line: str):
     parts = line.strip().split(",")
     return (
-        int(parts[0]),  # Time
-        int(parts[1]),  # VID
-        int(parts[2]),  # Spd
-        int(parts[3]),  # XWay
-        int(parts[4]),  # Lane
-        int(parts[5]),  # Dir
-        int(parts[6]),  # Seg
-        int(parts[7]),  # Pos
+        int(parts[0]),  
+        int(parts[1]),   
+        int(parts[2]),  
+        int(parts[3]),  
+        int(parts[4]),  
+        int(parts[5]),  
+        int(parts[6]),  
+        int(parts[7]),  
     )
 
 
